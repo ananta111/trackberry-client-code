@@ -21,11 +21,13 @@ class Geometry:
 class ProcessFile:
 
     def __init__(self, filename, write=True):
-        self.file = open(filename, "w") if write else open(filename, "r")
+        self.filename = filename
+        self.file = open(filename, "a") if write else open(filename, "r")
 
     def add_geometry_to_file(self, geometry):
-        print (geometry)
+        self.file = open(self.filename, "a")
         self.file.write(str(geometry))
+        self.close_file()
 
     def close_file(self):
         self.file.close()
