@@ -3,6 +3,9 @@ from numbers import Number
 import time
 import serial
 import requests
+import signal
+import os
+import sys
 import random
 import json
 
@@ -34,14 +37,12 @@ def long(deg, min):
     return deg + min/60
 
 
-def collect_from_arduino(sample_rate=3):
+def collect_from_arduino(sample_rate=5):
     arduino = setup()
     input_file_process = ProcessFile("output.txt")
     while 1:
         try:
             data = arduino.readline()
-            if not data:
-                break
             if data:
                 print(data)
                 tokens = data.decode('ISO-8859-1').split(',')
@@ -78,19 +79,19 @@ def collect_from_arduino(sample_rate=3):
                         sendLat = -1 * sendLat
                     elif ("W" in EW):
                         sendLong = -1 * sendLong
-                    print(sendLat)
-                    print(sendLong)
+                    print("lat", sendLat)
+                    print("lng", sendLong)
 
-                    # g = Geometry(sendLat, sendLong)
-                    g = Geometry(88.4, -99.7)
+                    g = Geometry(sendLat, sendLong)
+                    # g = Geometry(88.4, -99.7)
                     input_file_process.add_geometry_to_file(g)
-                    print(gpSend(sendLong, sendLat))
+                     #print(gpSend(sendLong, sendLat))
                     arduino.close()
-                    time.sleep(60)
+                    time.sleep(sample_rate)
                     arduino.open()
         except:
             time.sleep(sample_rate)
-    input_file_process.close_file()
+        input_file_process.close_file()
 
 
 def test_collection(samples=44):
@@ -110,21 +111,50 @@ def send_to_db_from_file(input_file):
     for g in coordinates_list:
         latitude, longitude = g.get_latlng()
         gpSend(latitude, longitude)
-        print ("seending to database", latitude, longitude)
+        print ("sending to database", latitude, longitude)
     output_file_process.close_file()
 
 
-def main(test=False):
+def handler():
+    if connect():
+        send_to_db_from_file("output.txt")
+        file = open("output.txt", "r+")
+        file.truncate(0)
+        file.close()
+    else:
+        print ("No internet connection! Retry sending data to the database manually later!")
+    print("Exiting")
+
+
+def connect(host='http://google.com'):
+    try:
+        requests.get(host)
+        return True
+    except:
+        return False
+
+
+#signal.signal(signal.SIGINT, handler)
+
+
+def main(test=False, send_to_db=False):
     if test:
         test_collection()
         send_to_db_from_file("test_output.txt")
     else:
-        collect_from_arduino()
-        send_to_db_from_file("output.txt")
+        if send_to_db:
+            send_to_db_from_file("output.txt")
+        else:
+            collect_from_arduino()
+
 
 
 if __name__ == "__main__":
-    main(test=True)
+    try:
+        main(send_to_db=False)
+    except KeyboardInterrupt:
+        handler()
+        sys.exit()
 
 
 
